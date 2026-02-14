@@ -513,6 +513,11 @@ apk_editor() {
 	
 	# Remove unwanted architecture libraries
 	local stripped=0
+	if [ -z "$temp_dir" ] || [ ! -d "$temp_dir" ]; then
+		epr "Invalid temporary directory: $temp_dir"
+		return 1
+	fi
+	
 	for lib_arch in "${remove_libs[@]}"; do
 		if [ -d "$temp_dir/lib/$lib_arch" ]; then
 			pr "  ✂ Removing lib/$lib_arch"
@@ -534,7 +539,11 @@ apk_editor() {
 	# Repackage APK
 	pr "Repackaging APK..."
 	local unsigned_apk="${apk_file%.apk}-unsigned.apk"
-	if ! (cd "$temp_dir" && zip -qr "${CWD}/${unsigned_apk}" .); then
+	local abs_apk_path
+	abs_apk_path=$(cd "$(dirname "$apk_file")" && pwd)
+	abs_apk_path="${abs_apk_path}/$(basename "$unsigned_apk")"
+	
+	if ! (cd "$temp_dir" && zip -qr "$abs_apk_path" .); then
 		epr "Failed to repackage APK, restoring backup"
 		mv "$backup_file" "$apk_file"
 		rm -rf "$temp_dir"
@@ -556,8 +565,8 @@ apk_editor() {
 	# Get file sizes for logging
 	local old_size
 	local new_size
-	old_size=$(stat -f%z "$backup_file" 2>/dev/null || stat -c%s "$backup_file" 2>/dev/null || echo "unknown")
-	new_size=$(stat -f%z "$apk_file" 2>/dev/null || stat -c%s "$apk_file" 2>/dev/null || echo "unknown")
+	old_size=$(get_file_size "$backup_file")
+	new_size=$(get_file_size "$apk_file")
 	
 	pr "✓ Optimized: $(numfmt --to=iec-i --suffix=B "$old_size" 2>/dev/null || echo "$old_size") → $(numfmt --to=iec-i --suffix=B "$new_size" 2>/dev/null || echo "$new_size")"
 	
@@ -566,6 +575,12 @@ apk_editor() {
 	rm -rf "$temp_dir"
 	
 	return 0
+}
+
+# Helper function to get file size in a cross-platform way
+get_file_size() {
+	local file=$1
+	stat -f%z "$file" 2>/dev/null || stat -c%s "$file" 2>/dev/null || echo "unknown"
 }
 
 check_sig() {

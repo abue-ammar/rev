@@ -549,8 +549,23 @@ strip_apk_libs() {
 		return 1
 	}
 	
+	# Re-sign the APK after repacking
+	pr "Re-signing optimized APK..."
+	local unsigned_apk="${apk_path%.apk}-unsigned.apk"
+	mv "$apk_path" "$unsigned_apk"
+	
+	if ! java -jar "$APKSIGNER" sign --ks ks.keystore --ks-key-alias jhc \
+		--ks-pass pass:123456789 --key-pass pass:123456789 \
+		--out "$apk_path" "$unsigned_apk" 2>/dev/null; then
+		epr "Failed to re-sign APK"
+		mv "$backup_apk" "$apk_path"
+		rm -f "$unsigned_apk"
+		rm -rf "$temp_dir"
+		return 1
+	fi
+	
 	# Clean up
-	rm -f "$backup_apk"
+	rm -f "$backup_apk" "$unsigned_apk"
 	rm -rf "$temp_dir"
 	
 	pr "✓ Successfully optimized APK (removed $removed_count architecture(s))"

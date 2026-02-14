@@ -469,6 +469,90 @@ patch_apk() {
 	fi
 }
 
+# Post-process APK to remove unused architecture libraries
+# This is a fallback for CLIs that don't support --rip-lib (like Morphe CLI)
+strip_apk_libs() {
+	local apk_path=$1
+	local target_arch=$2
+	
+	if [ ! -f "$apk_path" ]; then
+		epr "APK not found for library stripping: $apk_path"
+		return 1
+	fi
+	
+	# Skip if arch is "all" - keep all libraries
+	if [ "$target_arch" = "all" ]; then
+		pr "Arch is 'all', keeping all libraries"
+		return 0
+	fi
+	
+	# Define architecture mappings
+	local all_archs=("arm64-v8a" "armeabi-v7a" "x86_64" "x86")
+	local libs_to_remove=()
+	
+	# Determine which libraries to remove based on target architecture
+	for arch in "${all_archs[@]}"; do
+		if [ "$arch" != "$target_arch" ]; then
+			libs_to_remove+=("$arch")
+		fi
+	done
+	
+	# Create temporary directory for extraction
+	local temp_dir="${apk_path%.apk}-temp"
+	rm -rf "$temp_dir"
+	mkdir -p "$temp_dir"
+	
+	pr "Extracting APK for library optimization..."
+	if ! unzip -q "$apk_path" -d "$temp_dir" 2>/dev/null; then
+		epr "Failed to extract APK for library stripping"
+		rm -rf "$temp_dir"
+		return 1
+	fi
+	
+	# Check if lib directory exists
+	if [ ! -d "$temp_dir/lib" ]; then
+		pr "No lib directory found in APK, skipping library stripping"
+		rm -rf "$temp_dir"
+		return 0
+	fi
+	
+	# Remove unwanted architecture libraries
+	local removed_count=0
+	pr "Removing unused architecture libraries..."
+	for lib_arch in "${libs_to_remove[@]}"; do
+		if [ -d "$temp_dir/lib/$lib_arch" ]; then
+			pr "  - Removing lib/$lib_arch"
+			rm -rf "$temp_dir/lib/$lib_arch"
+			((removed_count++))
+		fi
+	done
+	
+	if [ $removed_count -eq 0 ]; then
+		pr "No libraries were removed (might have been stripped by CLI)"
+		rm -rf "$temp_dir"
+		return 0
+	fi
+	
+	# Repackage the APK
+	pr "Repackaging optimized APK..."
+	local backup_apk="${apk_path}.backup"
+	mv "$apk_path" "$backup_apk"
+	
+	(cd "$temp_dir" && zip -qr "$apk_path" .) || {
+		epr "Failed to repackage APK"
+		mv "$backup_apk" "$apk_path"
+		rm -rf "$temp_dir"
+		return 1
+	}
+	
+	# Clean up
+	rm -f "$backup_apk"
+	rm -rf "$temp_dir"
+	
+	pr "✓ Successfully optimized APK (removed $removed_count architecture(s))"
+	return 0
+}
+
 check_sig() {
 	local file=$1 pkg_name=$2
 	local sig
@@ -634,7 +718,18 @@ build_rv() {
 		if [ "$build_mode" = apk ]; then
 			local apk_output="${BUILD_DIR}/${app_name_l}-${rv_brand_f}-v${version_f}-${arch_f}.apk"
 			mv -f "$patched_apk" "$apk_output"
-			pr "Built ${table} (non-root): '${apk_output}'"
+			
+			# Post-process: Strip unused libraries if riplib is enabled
+			if [ "${args[riplib]}" = true ] && [ "$arch" != "all" ]; then
+				pr "Post-processing: Verifying library optimization..."
+				if strip_apk_libs "$apk_output" "$arch"; then
+					pr "Built ${table} (non-root): '${apk_output}' [optimized]"
+				else
+					pr "Built ${table} (non-root): '${apk_output}' [optimization failed, keeping full size]"
+				fi
+			else
+				pr "Built ${table} (non-root): '${apk_output}'"
+			fi
 			continue
 		fi
 		local base_template

@@ -607,16 +607,23 @@ build_rv() {
 		# 	patcher_args+=("-d \"${spoof_video_patch}\"")
 		# fi
 		if [ "${args[riplib]}" = true ]; then
+			pr "Optimizing APK size: Removing unused architecture libraries"
 			patcher_args+=("--rip-lib x86_64 --rip-lib x86")
+			pr "  - Stripping x86 and x86_64 libraries"
 			if [ "$build_mode" = module ]; then
 				patcher_args+=("--rip-lib arm64-v8a --rip-lib armeabi-v7a --unsigned")
+				pr "  - Stripping all ARM libraries (module mode)"
 			else
 				if [ "$arch" = "arm64-v8a" ]; then
 					patcher_args+=("--rip-lib armeabi-v7a")
+					pr "  - Stripping armeabi-v7a libraries (keeping arm64-v8a only)"
 				elif [ "$arch" = "arm-v7a" ]; then
 					patcher_args+=("--rip-lib arm64-v8a")
+					pr "  - Stripping arm64-v8a libraries (keeping armeabi-v7a only)"
 				fi
 			fi
+		else
+			pr "Note: riplib is disabled, APK will contain all architecture libraries"
 		fi
 		if [ "${NORB:-}" != true ] || [ ! -f "$patched_apk" ]; then
 			if ! patch_apk "$stock_apk" "$patched_apk" "${patcher_args[*]}" "${args[cli]}" "${args[ptjar]}"; then

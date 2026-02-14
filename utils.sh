@@ -516,7 +516,7 @@ apk_editor() {
 	for lib_arch in "${remove_libs[@]}"; do
 		if [ -d "$temp_dir/lib/$lib_arch" ]; then
 			pr "  ✂ Removing lib/$lib_arch"
-			rm -rf "$temp_dir/lib/$lib_arch"
+			rm -rf "${temp_dir:?}/lib/$lib_arch"
 			((stripped++))
 		fi
 	done
@@ -554,10 +554,12 @@ apk_editor() {
 	fi
 	
 	# Get file sizes for logging
-	local old_size=$(stat -f%z "$backup_file" 2>/dev/null || stat -c%s "$backup_file" 2>/dev/null || echo "unknown")
-	local new_size=$(stat -f%z "$apk_file" 2>/dev/null || stat -c%s "$apk_file" 2>/dev/null || echo "unknown")
+	local old_size
+	local new_size
+	old_size=$(stat -f%z "$backup_file" 2>/dev/null || stat -c%s "$backup_file" 2>/dev/null || echo "unknown")
+	new_size=$(stat -f%z "$apk_file" 2>/dev/null || stat -c%s "$apk_file" 2>/dev/null || echo "unknown")
 	
-	pr "✓ Optimized: $(numfmt --to=iec-i --suffix=B $old_size 2>/dev/null || echo $old_size) → $(numfmt --to=iec-i --suffix=B $new_size 2>/dev/null || echo $new_size)"
+	pr "✓ Optimized: $(numfmt --to=iec-i --suffix=B "$old_size" 2>/dev/null || echo "$old_size") → $(numfmt --to=iec-i --suffix=B "$new_size" 2>/dev/null || echo "$new_size")"
 	
 	# Clean up
 	rm -f "$backup_file" "$unsigned_apk"

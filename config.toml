@@ -1,16 +1,13 @@
-enable-magisk-update = false # set this to false if you do not want to receive updates for the module in magisk app
+enable-magisk-update = false
 parallel-jobs = 1
-
-# add 'enabled = false' for not patching a specific app or remove it from the config
-# see https://github.com/j-hc/revanced-magisk-module/blob/main/CONFIG.md for more detailed explanations
-
-# you can use rvmm-config-gen to generate a config
 
 [YouTube]
 build-mode = "apk"
 excluded-patches = "'Custom branding' 'Change header' 'Announcements' 'Downloads' 'Enable debugging'"
 included-patches = ""
 version = "auto"
+arch = "all"  
+riplib = true 
 apkmirror-dlurl = "https://www.apkmirror.com/apk/google-inc/youtube"
 uptodown-dlurl = "https://youtube.en.uptodown.com/android"
 archive-dlurl = "https://archive.org/download/jhc-apks/apks/com.google.android.youtube"
@@ -26,6 +23,7 @@ arch = "arm64-v8a"
 version = "auto"
 excluded-patches = ""
 included-patches = ""
+riplib = true 
 apkmirror-dlurl = "https://www.apkmirror.com/apk/google-inc/youtube"
 uptodown-dlurl = "https://youtube.en.uptodown.com/android"
 
@@ -34,3 +32,4 @@ enabled = true
 uptodown-dlurl = "https://facebook-messenger.en.uptodown.com/android"
 excluded-patches = "'Hide inbox subtabs' 'Disable typing indicator'"
 arch = "arm64-v8a"
+riplib = true

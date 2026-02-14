@@ -7,15 +7,6 @@ BIN_DIR="bin"
 BUILD_DIR="build"
 PATCH_EXT=""
 
-# Architecture stripping configuration
-ARCHS_ALL=("arm64-v8a" "armeabi-v7a" "x86_64" "x86")
-declare -A LIBS_TO_REMOVE=(
-	["arm64-v8a"]="armeabi-v7a x86_64 x86"
-	["armeabi-v7a"]="arm64-v8a x86_64 x86"
-	["x86_64"]="arm64-v8a armeabi-v7a x86"
-	["x86"]="arm64-v8a armeabi-v7a x86_64"
-)
-
 if [ "${GITHUB_TOKEN-}" ]; then GH_HEADER="Authorization: token ${GITHUB_TOKEN}"; else GH_HEADER=; fi
 NEXT_VER_CODE=${NEXT_VER_CODE:-$(date +'%Y%m%d')}
 OS=$(uname -o)
@@ -479,125 +470,66 @@ patch_apk() {
 }
 
 # Strip unused architecture libraries from APK
-# This mimics the approach from Revanced-And-Revanced-Extended-Non-Root
-apk_editor() {
-	local apk_name=$1
+strip_libs() {
+	local apk_path=$1
 	local keep_arch=$2
-	shift 2
-	local remove_libs=("$@")
 	
-	local apk_file="${BUILD_DIR}/${apk_name}.apk"
-	local temp_dir="${TEMP_DIR}/${apk_name}-strip"
-	
-	if [ ! -f "$apk_file" ]; then
-		epr "APK not found for library stripping: $apk_file"
-		return 1
-	fi
-	
-	# Validate temp_dir before use
-	if [ -z "$temp_dir" ]; then
-		epr "Invalid temporary directory path"
-		return 1
-	fi
-	
-	pr "Stripping libraries from ${apk_name}.apk (keeping ${keep_arch})..."
-	
-	# Extract APK
-	rm -rf "$temp_dir"
-	if ! unzip -q "$apk_file" -d "$temp_dir"; then
-		epr "Failed to extract APK"
-		rm -rf "$temp_dir"
-		return 1
-	fi
-	
-	# Check if lib directory exists
-	if [ ! -d "$temp_dir/lib" ]; then
-		pr "No lib/ directory found, skipping"
-		rm -rf "$temp_dir"
+	# Skip if arch is "all"
+	if [ "$keep_arch" = "all" ]; then
 		return 0
 	fi
 	
-	# Remove unwanted architecture libraries
-	local stripped=0
-	if [ ! -d "$temp_dir" ]; then
-		epr "Temporary directory does not exist: $temp_dir"
-		return 1
-	fi
+	# Determine which libs to remove
+	local remove_libs=()
+	case "$keep_arch" in
+		"arm64-v8a")
+			remove_libs=("armeabi-v7a" "x86" "x86_64")
+			;;
+		"armeabi-v7a")
+			remove_libs=("arm64-v8a" "x86" "x86_64")
+			;;
+		"x86")
+			remove_libs=("arm64-v8a" "armeabi-v7a" "x86_64")
+			;;
+		"x86_64")
+			remove_libs=("arm64-v8a" "armeabi-v7a" "x86")
+			;;
+		*)
+			return 0
+			;;
+	esac
 	
-	for lib_arch in "${remove_libs[@]}"; do
-		if [ -d "$temp_dir/lib/$lib_arch" ]; then
-			pr "  ✂ Removing lib/$lib_arch"
-			rm -rf "${temp_dir:?}/lib/$lib_arch"
-			((stripped++))
-		fi
-	done
-	
-	if [ $stripped -eq 0 ]; then
-		pr "No libraries needed to be removed"
-		rm -rf "$temp_dir"
-		return 0
-	fi
-	
-	# Backup original
-	local backup_file="${apk_file}.backup"
-	mv "$apk_file" "$backup_file"
-	
-	# Repackage APK
-	pr "Repackaging APK..."
-	local unsigned_apk="${apk_file%.apk}-unsigned.apk"
-	local abs_apk_path
-	abs_apk_path=$(cd "$(dirname "$apk_file")" && pwd)
-	abs_apk_path="${abs_apk_path}/$(basename "$unsigned_apk")"
-	
-	if ! (cd "$temp_dir" && zip -qr "$abs_apk_path" .); then
-		epr "Failed to repackage APK, restoring backup"
-		mv "$backup_file" "$apk_file"
-		rm -rf "$temp_dir"
-		return 1
-	fi
-	
-	# Re-sign the APK
-	pr "Re-signing APK..."
-	if ! java -jar "$APKSIGNER" sign --ks ks.keystore --ks-key-alias jhc \
-		--ks-pass pass:123456789 --key-pass pass:123456789 \
-		--out "$apk_file" "$unsigned_apk" 2>/dev/null; then
-		epr "Failed to re-sign APK, restoring backup"
-		mv "$backup_file" "$apk_file"
-		rm -f "$unsigned_apk"
-		rm -rf "$temp_dir"
-		return 1
-	fi
-	
-	# Get file sizes for logging
-	local old_size
-	local new_size
-	old_size=$(get_file_size "$backup_file")
-	new_size=$(get_file_size "$apk_file")
-	
-	local old_size_fmt
-	local new_size_fmt
-	old_size_fmt=$(format_file_size "$old_size")
-	new_size_fmt=$(format_file_size "$new_size")
-	
-	pr "✓ Optimized: $old_size_fmt → $new_size_fmt"
-	
-	# Clean up
-	rm -f "$backup_file" "$unsigned_apk"
+	local temp_dir="${apk_path%.apk}-temp"
 	rm -rf "$temp_dir"
 	
-	return 0
-}
-
-# Helper function to get file size in a cross-platform way
-get_file_size() {
-	local file=$1
-	stat -f%z "$file" 2>/dev/null || stat -c%s "$file" 2>/dev/null || echo "unknown"
-}
-
-# Helper function to format file size for display
-format_file_size() {
-	local size=$1
-	numfmt --to=iec-i --suffix=B "$size" 2>/dev/null || echo "$size"
+	# Unzip APK
+	if ! unzip -q "$apk_path" -d "$temp_dir" 2>/dev/null; then
+		rm -rf "$temp_dir"
+		return 1
+	fi
+	
+	# Delete unwanted lib folders
+	if [ -d "$temp_dir/lib" ]; then
+		for lib in "${remove_libs[@]}"; do
+			if [ -d "$temp_dir/lib/$lib" ]; then
+				rm -rf "$temp_dir/lib/$lib"
+			fi
+		done
+	fi
+	
+	# Rezip APK
+	local backup="${apk_path}.bak"
+	mv "$apk_path" "$backup"
+	
+	if (cd "$temp_dir" && zip -qr "${CWD}/${apk_path}" .); then
+		rm -f "$backup"
+		rm -rf "$temp_dir"
+		return 0
+	else
+		mv "$backup" "$apk_path"
+		rm -rf "$temp_dir"
+		return 1
+	fi
 }
 
 check_sig() {
@@ -765,25 +697,13 @@ build_rv() {
 		if [ "$build_mode" = apk ]; then
 			local apk_output="${BUILD_DIR}/${app_name_l}-${rv_brand_f}-v${version_f}-${arch_f}.apk"
 			mv -f "$patched_apk" "$apk_output"
-			pr "Built ${table} (non-root): '${apk_output}'"
 			
-			# Strip unused architecture libraries if riplib is enabled
-			if [ "${args[riplib]}" = true ] && [ "$arch" != "all" ]; then
-				local apk_basename
-				apk_basename=$(basename "$apk_output" .apk)
-				
-				# Parse space-separated library list into array
-				local libs_remove=()
-				if [ -n "${LIBS_TO_REMOVE[$arch]}" ]; then
-					IFS=' ' read -ra libs_remove <<< "${LIBS_TO_REMOVE[$arch]}"
-				fi
-				
-				if [ ${#libs_remove[@]} -gt 0 ]; then
-					pr "Running library optimization (riplib=true)..."
-					apk_editor "$apk_basename" "$arch" "${libs_remove[@]}"
-				fi
+			# Strip libraries if riplib is enabled
+			if [ "${args[riplib]}" = true ]; then
+				strip_libs "$apk_output" "$arch"
 			fi
 			
+			pr "Built ${table} (non-root): '${apk_output}'"
 			continue
 		fi
 		local base_template

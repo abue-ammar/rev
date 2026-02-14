@@ -494,6 +494,12 @@ apk_editor() {
 		return 1
 	fi
 	
+	# Validate temp_dir before use
+	if [ -z "$temp_dir" ]; then
+		epr "Invalid temporary directory path"
+		return 1
+	fi
+	
 	pr "Stripping libraries from ${apk_name}.apk (keeping ${keep_arch})..."
 	
 	# Extract APK
@@ -513,8 +519,8 @@ apk_editor() {
 	
 	# Remove unwanted architecture libraries
 	local stripped=0
-	if [ -z "$temp_dir" ] || [ ! -d "$temp_dir" ]; then
-		epr "Invalid temporary directory: $temp_dir"
+	if [ ! -d "$temp_dir" ]; then
+		epr "Temporary directory does not exist: $temp_dir"
 		return 1
 	fi
 	
@@ -568,7 +574,12 @@ apk_editor() {
 	old_size=$(get_file_size "$backup_file")
 	new_size=$(get_file_size "$apk_file")
 	
-	pr "✓ Optimized: $(numfmt --to=iec-i --suffix=B "$old_size" 2>/dev/null || echo "$old_size") → $(numfmt --to=iec-i --suffix=B "$new_size" 2>/dev/null || echo "$new_size")"
+	local old_size_fmt
+	local new_size_fmt
+	old_size_fmt=$(format_file_size "$old_size")
+	new_size_fmt=$(format_file_size "$new_size")
+	
+	pr "✓ Optimized: $old_size_fmt → $new_size_fmt"
 	
 	# Clean up
 	rm -f "$backup_file" "$unsigned_apk"
@@ -581,6 +592,12 @@ apk_editor() {
 get_file_size() {
 	local file=$1
 	stat -f%z "$file" 2>/dev/null || stat -c%s "$file" 2>/dev/null || echo "unknown"
+}
+
+# Helper function to format file size for display
+format_file_size() {
+	local size=$1
+	numfmt --to=iec-i --suffix=B "$size" 2>/dev/null || echo "$size"
 }
 
 check_sig() {
@@ -752,8 +769,14 @@ build_rv() {
 			
 			# Strip unused architecture libraries if riplib is enabled
 			if [ "${args[riplib]}" = true ] && [ "$arch" != "all" ]; then
-				local apk_basename=$(basename "$apk_output" .apk)
-				local libs_remove=(${LIBS_TO_REMOVE[$arch]})
+				local apk_basename
+				apk_basename=$(basename "$apk_output" .apk)
+				
+				# Parse space-separated library list into array
+				local libs_remove=()
+				if [ -n "${LIBS_TO_REMOVE[$arch]}" ]; then
+					IFS=' ' read -ra libs_remove <<< "${LIBS_TO_REMOVE[$arch]}"
+				fi
 				
 				if [ ${#libs_remove[@]} -gt 0 ]; then
 					pr "Running library optimization (riplib=true)..."

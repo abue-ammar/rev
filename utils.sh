@@ -538,7 +538,11 @@ strip_apk_libs() {
 	local backup_apk="${apk_path}.backup"
 	mv "$apk_path" "$backup_apk"
 	
-	(cd "$temp_dir" && zip -qr "$apk_path" .) || {
+	local abs_apk_path
+	abs_apk_path=$(realpath "$backup_apk")
+	abs_apk_path="${abs_apk_path%.backup}"
+	
+	(cd "$temp_dir" && zip -qr "$abs_apk_path" .) || {
 		epr "Failed to repackage APK"
 		mv "$backup_apk" "$apk_path"
 		rm -rf "$temp_dir"

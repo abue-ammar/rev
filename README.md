@@ -1,57 +1,37 @@
-# ReVanced Magisk Module
-[![Telegram](https://img.shields.io/badge/Telegram-2CA5E0?style=for-the-badge&logo=telegram&logoColor=white)](https://t.me/rvc_magisk)
-[![CI](https://github.com/j-hc/revanced-magisk-module/actions/workflows/ci.yml/badge.svg?event=schedule)](https://github.com/j-hc/revanced-magisk-module/actions/workflows/ci.yml)
+# Messenger ReVanced
 
-Extensive ReVanced builder  
+Builds a patched Messenger APK (arm64-v8a) using [ReVanced](https://github.com/ReVanced/revanced-patches).
 
-Get the [latest CI release](https://github.com/j-hc/revanced-magisk-module/releases).
+## Usage
 
-Use [**zygisk-detach**](https://github.com/j-hc/zygisk-detach) to detach YouTube and YT Music from Play Store if you are using magisk modules. 
+1. Run the [Build workflow](../../actions/workflows/build.yml)
+2. Grab your APK from [Releases](../../releases)
 
-<details><summary><big>Features</big></summary>
-<ul>
- <li>Support all present and future ReVanced and <a href="https://github.com/inotia00/revanced-patches">ReVanced Extended</a> apps</li>
- <li> Can build Magisk modules and non-root APKs</li>
- <li> Updated daily with the latest versions of apps and patches</li>
- <li> Optimize APKs and modules for size</li>
- <li> Modules</li>
-    <ul>
-     <li> recompile invalidated odex for faster usage</li>
-     <li> receive updates from Magisk app</li>
-     <li> do not break safetynet or trigger root detections</li>
-     <li> handle installation of the correct version of the stock app and all that</li>
-     <li> support Magisk and KernelSU</li>
-    </ul>
-</ul>
-Note that the <a href="../../actions/workflows/ci.yml">CI workflow</a> is scheduled to build the modules and APKs everyday using GitHub Actions if there is a change in ReVanced patches. You may want to disable it.
-</details>
+## Customizing `config.toml`
 
-## To include/exclude patches or patch other apps
+All keys are optional except `uptodown-dlurl`. Defaults are shown below.
+Global keys (set outside any `[section]`) apply to all apps unless overridden per-app.
 
- * Star the repo :eyes:
- * Use the repo as a [template](https://github.com/new?template_name=revanced-magisk-module&template_owner=j-hc)
- * Customize [`config.toml`](./config.toml) using [rvmm-config-gen](https://j-hc.github.io/rvmm-config-gen/)
- * Run the build [workflow](../../actions/workflows/build.yml)
- * Grab your modules and APKs from [releases](../../releases)
+```toml
+parallel-jobs = 1           # number of parallel build jobs (default: nproc)
 
-also see here [`CONFIG.md`](./CONFIG.md)
+# Override the source/version of patches and CLI (these are the built-in defaults;
+# only add these if you want to use a different source or pin a specific version)
+patches-source = "ReVanced/revanced-patches"
+cli-source = "j-hc/revanced-cli"
+patches-version = "latest"  # "latest", "dev", or a version tag e.g. "v5.0.0"
+cli-version = "latest"      # "latest", "dev", or a version tag
 
-## If you are having trouble with the classic mount method of the modules
-such as,
-- **"Reflash needed"** error after reboots
-- **"Suspicious mount detected"** warnings from root detector apps
-
-You can consider using [rvmm-zygisk-mount](https://github.com/j-hc/rvmm-zygisk-mount)
-
-## Building Locally
-### On Termux
-```console
-bash <(curl -sSf https://raw.githubusercontent.com/j-hc/revanced-magisk-module/main/build-termux.sh)
+[Messenger]
+enabled = true             # set to false to skip building
+build-mode = "apk"         # always "apk" (no module)
+arch = "arm64-v8a"         # CPU architecture
+version = "auto"           # "auto" (latest version supported by patches), "latest", or a specific version e.g. "500.0.0.11.110"
+uptodown-dlurl = "https://facebook-messenger.en.uptodown.com/android"
+excluded-patches = ""      # space-separated quoted patch names to disable, e.g. "'Patch Name' 'Another Patch'"
+included-patches = ""      # space-separated quoted patch names to enable (non-default patches)
+exclusive-patches = false  # if true, only included-patches are applied; all others are excluded
+patcher-args = ""          # extra arguments passed to the ReVanced CLI patcher
+riplib = true              # strip unused native libs to reduce APK size
 ```
 
-### On Desktop
-```console
-$ git clone https://github.com/j-hc/revanced-magisk-module
-$ cd revanced-magisk-module
-$ ./build.sh
-```

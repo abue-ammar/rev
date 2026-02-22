@@ -60,5 +60,7 @@ module-prop-name = "some-app-magisk"                       # magisk module prop 
 dpi = "360-480dpi"                               # used to select apk variant from apkmirror. default: nodpi
 arch = "arm64-v8a"                                         # 'arm64-v8a', 'arm-v7a', 'all', 'both'. 'both' downloads both arm64-v8a and arm-v7a. default: all
 riplib = true                                              # enables ripping x86 and x86_64 libs from apks with j-hc revanced cli. default: true
+# Note: for CLIs that support --striplibs (e.g. morphe-cli), --striplibs is applied automatically
+# when arch is 'arm64-v8a' or 'arm-v7a' and build-mode is 'apk'. No extra config option needed.
 
 ```

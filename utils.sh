@@ -556,18 +556,6 @@ build_rv() {
 	fi
 	log "${table}: ${version}"
 
-	local microg_patch
-	microg_patch=$(grep "^Name: " <<<"$list_patches" | grep -i "gmscore\|microg" || :) microg_patch=${microg_patch#*: }
-	if [ -n "$microg_patch" ] && [[ ${p_patcher_args[*]} =~ $microg_patch ]]; then
-		epr "You can't include/exclude microg patch as that's done by the builder automatically."
-		p_patcher_args=("${p_patcher_args[@]//-[ei] ${microg_patch}/}")
-	fi
-
-	# local spoof_client_patch
-	# spoof_client_patch=$(grep "^Name: " <<<"$list_patches" | grep -i "Spoof Client" || :) spoof_client_patch=${spoof_client_patch#*: }
-	# local spoof_video_patch
-	# spoof_video_patch=$(grep "^Name: " <<<"$list_patches" | grep -i "Spoof Video" || :) spoof_video_patch=${spoof_video_patch#*: }
-
 	local patcher_args patched_apk build_mode
 	local rv_brand_f=${args[rv_brand],,}
 	rv_brand_f=${rv_brand_f// /-}
@@ -576,9 +564,6 @@ build_rv() {
 		patcher_args=("${p_patcher_args[@]}")
 		pr "Building '${table}' in '$build_mode' mode"
 		patched_apk="${TEMP_DIR}/${app_name_l}-${rv_brand_f}-${version_f}-${arch_f}.apk"
-		if [ -n "$microg_patch" ]; then
-			patcher_args+=("-e \"${microg_patch}\"")
-		fi
 		if [ "${args[striplibs]:-false}" = true ] && [ "$build_mode" = apk ] && [[ "$arch" == "arm64-v8a" || "$arch" == "arm-v7a" ]]; then
 			local strip_arch="$arch"
 			[ "$strip_arch" = "arm-v7a" ] && strip_arch="armeabi-v7a"

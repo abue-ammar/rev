@@ -89,7 +89,7 @@ for table_name in $(toml_get_table_names); do
 		app_args[riplib]=${cliriplib[${app_args[cli]}]}
 		app_args[striplibs]=${clistriplibs[${app_args[cli]}]}
 	else
-		cli_help=$(java -jar "${app_args[cli]}" patch 2>&1)
+		cli_help=$(java -jar "${app_args[cli]}" patch 2>&1) || true
 		if [[ "$cli_help" == *rip-lib* ]]; then
 			cliriplib[${app_args[cli]}]=true
 			app_args[riplib]=true

@@ -460,7 +460,7 @@ get_archive_pkg_name() { echo "$__ARCHIVE_PKG_NAME__"; }
 patch_apk() {
 	local stock_input=$1 patched_apk=$2 patcher_args=$3 cli_jar=$4 patches_jar=$5
 	local cmd="env -u GITHUB_REPOSITORY java -jar '$cli_jar' patch '$stock_input' --purge -o '$patched_apk' -p '$patches_jar' --keystore=ks.keystore \
---keystore-entry-password=123456789 --keystore-password=123456789 --signer=jhc --keystore-entry-alias=jhc --striplibs arm64-v8a $patcher_args"
+--keystore-entry-password=123456789 --keystore-password=123456789 --signer=jhc --keystore-entry-alias=jhc $patcher_args"
 	if [ "$OS" = Android ]; then cmd+=" --custom-aapt2-binary='${AAPT2}'"; fi
 	pr "$cmd"
 	if eval "$cmd"; then [ -f "$patched_apk" ]; else
@@ -607,14 +607,20 @@ build_rv() {
 		# 	patcher_args+=("-d \"${spoof_video_patch}\"")
 		# fi
 		if [ "${args[riplib]}" = true ]; then
-			patcher_args+=("--rip-lib x86_64 --rip-lib x86")
-			if [ "$build_mode" = module ]; then
-				patcher_args+=("--rip-lib arm64-v8a --rip-lib armeabi-v7a --unsigned")
+			if [ "${args[striplibs]:-false}" = true ] && [ "$build_mode" = apk ] && [[ "$arch" == "arm64-v8a" || "$arch" == "arm-v7a" ]]; then
+				local strip_arch="$arch"
+				[ "$strip_arch" = "arm-v7a" ] && strip_arch="armeabi-v7a"
+				patcher_args+=("--striplibs $strip_arch")
 			else
-				if [ "$arch" = "arm64-v8a" ]; then
-					patcher_args+=("--rip-lib armeabi-v7a")
-				elif [ "$arch" = "arm-v7a" ]; then
-					patcher_args+=("--rip-lib arm64-v8a")
+				patcher_args+=("--rip-lib x86_64 --rip-lib x86")
+				if [ "$build_mode" = module ]; then
+					patcher_args+=("--rip-lib arm64-v8a --rip-lib armeabi-v7a --unsigned")
+				else
+					if [ "$arch" = "arm64-v8a" ]; then
+						patcher_args+=("--rip-lib armeabi-v7a")
+					elif [ "$arch" = "arm-v7a" ]; then
+						patcher_args+=("--rip-lib arm64-v8a")
+					fi
 				fi
 			fi
 		fi

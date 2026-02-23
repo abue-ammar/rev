@@ -1,4 +1,5 @@
 parallel-jobs = 1
+cli-source = "ReVanced/revanced-cli"
 
 [Messenger]
 enabled = true
